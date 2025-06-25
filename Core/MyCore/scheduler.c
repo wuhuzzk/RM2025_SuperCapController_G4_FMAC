@@ -144,7 +144,7 @@ void free_Uart_sent(void)
 {
 	// if(__HAL_DMA_GET_FLAG(&huart1,DMA_FLAG_TC1)==0)
 	// return;
-	static uint8_t buf[2048];					  // 发送缓冲区
+	static uint8_t buf[4096];					  // 发送缓冲区
 	uint32_t len = fifo_s_used(&uart_tx_fifo);	  // 待发送数据长度
 	fifo_s_gets(&uart_tx_fifo, (char *)buf, len); // 从 FIFO 取数据
 	HAL_UART_Transmit_DMA(&huart1, buf, len);	  // 发送
@@ -198,7 +198,6 @@ void Start_task(void)
 	{
 		Cap_Data.DCDC_start_step = 0;
 		error_Iloop_cnt = 0;
-		Cap_Data.cap_I_arm = 0;
 		DC_DC_stop();
 		Scheduler_stop(Start_task);
 		led_state[3] = 1;
@@ -260,7 +259,6 @@ void Start_task(void)
 		Cap_Data.DCDC_start_step = 0xC1;
 		error_Iloop_cnt = 0;
 		Cap_Data.PID_State = 1;
-		Cap_Data.cap_I_arm = 0;
 		
 		Scheduler_continue(UVLO);
 	}
@@ -272,6 +270,9 @@ static void Stop_cnt_task(void)
 	if (Cap_Data.Stop_cnt > 2)
 	{
 		Scheduler_stop(wdg_flash);
+		Scheduler_stop(Start_task);
+		DC_DC_stop();
+
 	}
 	Cap_Data.Stop_cnt = 0;
 }
@@ -353,11 +354,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	//定时器回调
 	// if (htim->Instance == TIM1) // 100khz 
 	{
-		if (((uint16_t)cnt_on_I & (uint16_t)0x01) == 1)
 		{
 			Power_Loop();
 		}
+	}
+}
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+	// ADC转换完成回调
+	if (hadc->Instance == ADC5)
+	{
 		I_Loop();
 	}
+
 	
 }

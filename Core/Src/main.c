@@ -147,8 +147,7 @@ int main(void)
   HAL_OPAMP_Start(&hopamp2);
   HAL_OPAMP_Start(&hopamp4);
 
-  HAL_HRTIM_WaveformCounterStart(&hhrtim1, HRTIM_TIMERID_TIMER_B | HRTIM_TIMERID_TIMER_A | HRTIM_TIMERID_MASTER );
-
+  HAL_HRTIM_WaveformCountStart(&hhrtim1, HRTIM_TIMERID_TIMER_B | HRTIM_TIMERID_TIMER_A | HRTIM_TIMERID_MASTER );
   HAL_UART_Receive_IT(&huart3, &aRxBuffer, 1);
 
   CANFilterInit();
@@ -165,7 +164,7 @@ int main(void)
   HAL_Delay(10);
 
   Scheduler_init();
-  Fmac_Init_user();
+
   // 取消下方两行注释，取消上电自启动
   // Scheduler_stop(Start_task);
   // Scheduler_stop(average1S);
@@ -173,7 +172,7 @@ int main(void)
   Scheduler_stop(UVLO);
 
   hiwdg.Init.Reload = 200;
-  HAL_IWDG_Init(&hiwdg);
+ HAL_IWDG_Init(&hiwdg);
 
   /* USER CODE END 2 */
 

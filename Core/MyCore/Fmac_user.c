@@ -49,7 +49,7 @@ static const int16_t aRefFilteredData[ARRAY_SIZE] =
 		0};
 
 
-void Fmac_Init_user(void)
+void Fmac_Init_user(float V_cap)
 {
 
 	/*## Configure the FMAC peripheral ###########################################*/
@@ -74,12 +74,17 @@ void Fmac_Init_user(void)
 	sFmacConfig.InputAccess = FMAC_BUFFER_ACCESS_NONE;
 	sFmacConfig.Clip = FMAC_CLIP_ENABLED;
 
+
 	/* R parameter contains the post-shift value */
 	if (HAL_FMAC_FilterConfig(&hfmac, &sFmacConfig) != HAL_OK)
 	{
 		/* Configuration Error */
 		Error_Handler();
 	}
+	int16_t q15_temp = (int)(((V_cap/13.5f)-1.0f) * 0x8000);
+	aOutputDataToPreload[0]=q15_temp;
+	aOutputDataToPreload[1]=q15_temp;
+	aOutputDataToPreload[2]=q15_temp;
 	/*## Preload the input and output buffers ####################################*/
 	//   if (HAL_FMAC_FilterPreload(&hfmac, aInputValues,INPUT_BUFFER_SIZE,aOutputDataToPreload, COEFF_VECTOR_A_SIZE) != HAL_OK)
 	if (HAL_FMAC_FilterPreload(&hfmac, NULL, INPUT_BUFFER_SIZE, aOutputDataToPreload, COEFF_VECTOR_A_SIZE) != HAL_OK)
@@ -95,7 +100,10 @@ void Fmac_Init_user(void)
 		Error_Handler();
 	}
 }
-
+void Fmac_User_stop(void)
+{
+	HAL_FMAC_FilterStop(&hfmac);
+}
 void Fmac_write_data(float fdata)
 {
 	int16_t CORDIC15;
@@ -147,9 +155,9 @@ void HAL_FMAC_OutputDataReadyCallback(FMAC_HandleTypeDef *hfmac)
 	OutputDataReadyCallback = CALLBACK_CALLED;
 	//***I_Loop_Fmac */
 	cnt_on_I++;
-	float temp = Fmac_Read_data(); // 0-0.125
-	Cap_Data.Ratio = (temp) / Sample_Data.sample_Pin24V_V;
-	Duty_calcuate_V2_0(Cap_Data.Ratio);
+	Cap_Data.Famc_out_data=(((float)aCalculatedFilteredData[0])/32768+1)*13.5f;
+	Cap_Data.Ratio = (Cap_Data.Famc_out_data)/ Sample_Data.sample_Pin24V_V; 
+	Duty_calcuate_V3_Q15((uint16_t)(Cap_Data.Ratio*Q15_zoom));
 	//**************** */
 }
 

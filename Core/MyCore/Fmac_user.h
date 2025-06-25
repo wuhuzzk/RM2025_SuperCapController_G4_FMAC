@@ -33,12 +33,12 @@
 
 /////////////////////////////////////////////////
 
-#define fmac_B0 (0x52FA)
-#define fmac_B1	(0x392)
-#define fmac_B2	(0xB099)
-#define fmac_A1	(0x6394)
-#define fmac_A2	(0x1C6C)
-#define post_shift (+0)
+#define fmac_B0 (15078)
+#define fmac_B1 (-26233)
+#define fmac_B2 (11410)
+#define fmac_A1 (5174)
+#define fmac_A2 (-1078)
+#define post_shift (3)
 
 /////////////////////////////////////////////////
 
@@ -89,7 +89,11 @@
 
 void famc_test(void);
 
-void Fmac_Init_user(void);
+
+
+void Fmac_Init_user(float V_cap);
+
+void Fmac_User_stop(void);
 
 void Fmac_write_data(float fdata);
 

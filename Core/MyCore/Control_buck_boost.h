@@ -25,7 +25,7 @@
 #include "usart.h"
 #include "Pid.h"
 
-
+#define Q15_zoom 0x8000
 
 typedef struct
 {
@@ -60,6 +60,7 @@ typedef struct
 	float cap_I_arm;	  // 电容目标电流
 	uint32_t cap_I_arm_DAC;	  // 电容目标电流
 	float cap_V_Fmac_delta;	  
+	float Famc_out_data; // FMAC输出数据
 	float Ratio;		  // 占空比
 	uint16_t Power_Limit; // 实际功率限制
 	float Power_PID_delta_arm;
@@ -114,6 +115,8 @@ void I_Loop_AdcToFloat(void);
 
 void Power_calcuate_v2_0();
 
+void Duty_calcuate_V3_Q15(uint16_t ratio);
+
 void Power_Loop_Pid();
 void I_Loop_Fmac();
 
@@ -135,6 +138,10 @@ uint8_t CAP_V_LIMIT(void);
 void I_loop_test(void);
 
 uint8_t I_loop_test_run(void);
+
+uint16_t Q15_mul(uint16_t a, uint16_t b);
+
+uint16_t Q15_div(uint16_t a, uint16_t b);
 
 /** @defgroup SUPERCAP_state_code
   * 

@@ -34,7 +34,10 @@ Pid_t pid_power_buffer;
 
 Pid_t *Pid_arrry[2] = {&pid_battery_power, &pid_power_buffer};
 
-cap_data Cap_Data = {.buffer_mode = 2, .Power_Limit = 45, .PID_State = 0, .Power_buffer_value = 2, .Power_buffer_percent = 0.966f, .can_powerlimit_value = 82, .Cap_full_voltage_value = 23.5, .Cap_full_voltage_measured = 0, .Cap_full_voltage_Dset = 23.5, .Cap_hight_V_mod = 0, .DCDC_start_step = 0, .Soft_Version = 0x03, .Can_sand = 0};
+cap_data Cap_Data = {.buffer_mode = 2, .Power_Limit = 45, .PID_State = 0, 
+	.Power_buffer_value = 2, .Power_buffer_percent = 0.966f, .can_powerlimit_value = 85, 
+	 .Cap_full_voltage_value = 23.5, .Cap_full_voltage_measured = 0, .Cap_full_voltage_Dset = 23.5, 
+	 .Cap_hight_V_mod = 0, .DCDC_start_step = 0, .Soft_Version = 0x03, .Can_sand = 0};
 extern uint8_t led_state[4];
 
 #define MiN(x, y) (x < y) ? x : y
@@ -52,9 +55,9 @@ IN240A1的放大倍数为20，电池采样10mR=0.010R，其余采样5mR=0.005R
 void Calculate_AdcToFloat(void)
 {
 
-	float battery_I_temp = (ADC_RawData.adc_Battery_I * 3.3f / 32767 - 1.65f) / 20 / 0.01f;
+	float battery_I_temp = (ADC_RawData.adc_Battery_I * 3.3f / 65536 - 1.65f) / 20 / 0.01f;
 	Sample_Data.sample_Battery_I = battery_I_temp * 0.9807f - 0.0567f;
-	float chassis_I_temp = (ADC_RawData.adc_Chassis_I * 3.3f / 32767 - 1.65f) / 20 / 0.005f;
+	float chassis_I_temp = (ADC_RawData.adc_Chassis_I * 3.3f / 65536 - 1.65f) / 20 / 0.005f;
 	if (chassis_I_temp > -0.147f)
 	{
 		Sample_Data.sample_Chassis_I = chassis_I_temp * 0.9676f - 0.1885f;
@@ -63,14 +66,13 @@ void Calculate_AdcToFloat(void)
 	{
 		Sample_Data.sample_Chassis_I = chassis_I_temp * 0.9820f - 0.2169f;
 	}
-	Sample_Data.sample_Cap_V = ADC_RawData.adc_Cap_V * 3.3f / 32767 * 11 / 12 * 11;
-	Sample_Data.sample_Pin24V_V = ADC_RawData.adc_Pin24V_Battery_V * 3.3f / 32767 * 11 / 12 * 11;
+	Sample_Data.sample_Cap_V = ADC_RawData.adc_Cap_V * 3.3f / 65536 * 11 / 12 * 11;
+	Sample_Data.sample_Pin24V_V = ADC_RawData.adc_Pin24V_Battery_V * 3.3f / 65536 * 11 / 12 * 11;
 
 	Sample_Data.sample_Battery_Power = Sample_Data.sample_Pin24V_V * Sample_Data.sample_Battery_I;
 	Sample_Data.sample_Cap_Power = Sample_Data.sample_Cap_V * Sample_Data.sample_Cap_I;
 	Sample_Data.sample_Chassis_Power = Sample_Data.sample_Pin24V_V * Sample_Data.sample_Chassis_I;
 
-	Cap_Data.BAT_Power_integration += Sample_Data.sample_Battery_Power;
 }
 // uint16_t temp_last;
 void I_Loop_AdcToFloat(void)
@@ -86,7 +88,7 @@ void I_Loop_AdcToFloat(void)
 		else
 			Sample_Data.sample_Cap_I = temp *1.0152f -0.2025f;
 	 */
-	Sample_Data.sample_Cap_I = (ADC_RawData.adc_Cap_I * 3.3f / 16383 - 1.65f) / 20 / 0.002f;
+	Sample_Data.sample_Cap_I = (ADC_RawData.adc_Cap_I * 3.3f / 65536 - 1.65f) / 20 / 0.002f;
 }
 
 #define Period_M HRTIM1->sMasterRegs.MPER
@@ -96,15 +98,13 @@ void I_Loop_AdcToFloat(void)
 总重装值为54400
 占空比最小1%最大99%(在总周期上的时长)
  */
-void HrtimerAB_UpdataForDuty(float a2_duty, float b2_duty)
+void HrtimerAB_UpdataForDuty_Q15(uint16_t a2_duty, uint16_t b2_duty)
 {
-	uint16_t hight_area = Period_M * (1 - a2_duty - b2_duty);
-
-	hight_area = (hight_area < 0) ? 0 : (hight_area > Period_M) ? Period_M
-																: hight_area;
-	uint16_t cmp1temp = a2_duty * Period_M;
+	uint32_t hight_area = ((uint32_t)Period_M * (ratio_zoom - a2_duty - b2_duty)) / ratio_zoom;
+	hight_area = (hight_area > Period_M) ? Period_M : hight_area;
+	uint16_t cmp1temp = (a2_duty * Period_M) / ratio_zoom;
 	uint16_t cmp2temp = cmp1temp + hight_area / 2;
-	uint16_t cmp3temp = cmp2temp + b2_duty * Period_M;
+	uint16_t cmp3temp = cmp2temp + (b2_duty * Period_M) / ratio_zoom;
 
 	HRTIM1->sMasterRegs.MCMP1R = cmp1temp;
 	HRTIM1->sMasterRegs.MCMP2R = cmp2temp;
@@ -112,20 +112,23 @@ void HrtimerAB_UpdataForDuty(float a2_duty, float b2_duty)
 }
 
 #define Dead_multiple (1 - 2 * DCDC_MIN_DUTY)
-void Duty_calcuate_V2_0(float ratio) // ratio=Vcap/V24
+void Duty_calcuate_V3_Q15(uint16_t ratio) // ratio=Vcap/V24
 {
-	float a2 = DCDC_MIN_DUTY, b2 = DCDC_MIN_DUTY;
-
-	if (ratio > 1) // boosts 升压充电到电容 或者buck放电
+	uint16_t a2 = DCDC_MIN_DUTY, b2 = DCDC_MIN_DUTY;
+	uint16_t ratio_temp=0;
+	if (ratio > ratio_zoom) // boosts 升压充电到电容 或者buck放电
 	{
-		float ratio_temp = (ratio - 1) * Dead_multiple + 1 + DCDC_MIN_DUTY;
-		HrtimerAB_UpdataForDuty(a2, 1 - (1 / ratio_temp));
+		ratio_temp = Q15_mul((ratio - ratio_zoom), Dead_multiple) + ratio_zoom + DCDC_MIN_DUTY; //@2.1 ￥
+		// HrtimerAB_UpdataForDuty_Q15(a2, ratio_zoom - Q15_div(ratio_zoom, ratio_temp));
+		b2=ratio_zoom - Q15_div(ratio_zoom, ratio_temp);
 	}
 	else // buck 降压充电到电容 或者boosts放电
 	{
-		float ratio_temp = Dead_multiple * ratio + DCDC_MIN_DUTY;
-		HrtimerAB_UpdataForDuty(1 - ratio_temp, b2);
+		ratio_temp = Q15_mul(Dead_multiple , ratio) + DCDC_MIN_DUTY; //@2.1 ￥
+		// HrtimerAB_UpdataForDuty_Q15(ratio_zoom - ratio_temp, b2);
+		a2=ratio_zoom - ratio_temp;
 	}
+	HrtimerAB_UpdataForDuty_Q15(a2, b2);
 }
 
 void Power_Loop_Pid()
@@ -136,10 +139,7 @@ void Power_Loop_Pid()
 	pid_calc(&pid_battery_power, Sample_Data.sample_Battery_Power, Cap_Data.Power_Limit);
 
 	Cap_Data.cap_I_arm = (power + pid_battery_power.last_delta_out) / Sample_Data.sample_Cap_V;
-	if (Sample_Data.sample_Cap_V < 10)
-	{
-		Cap_Data.cap_I_arm = KalmanFilter(&kalman_Cap_I_arm, Cap_Data.cap_I_arm, 1, 30);
-	}
+
 	// 电流限幅
 	clamp_f_limit(-24, 16, &Cap_Data.cap_I_arm);
 }
@@ -156,10 +156,10 @@ void DC_DC_start(void)
 	Cap_Data.cap_I_arm = 0;
 
 	Cap_Data.Ratio = Sample_Data.sample_Cap_V / Sample_Data.sample_Pin24V_V;
-	Duty_calcuate_V2_0(Cap_Data.Ratio);
+	Duty_calcuate_V3_Q15((uint16_t)(Cap_Data.Ratio*Q15_zoom));
 
 	Pid_clear_i(&pid_battery_power); // 清空功率环积分
-
+	Fmac_Init_user(Sample_Data.sample_Cap_V);
 	HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TB1 | HRTIM_OUTPUT_TB2 | HRTIM_OUTPUT_TA1 | HRTIM_OUTPUT_TA2);
 	HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 0);
 
@@ -174,6 +174,7 @@ void DC_DC_stop(void)
 	}
 
 	Cap_Data.PID_State = 0; // pid stop
+	Fmac_User_stop();
 	HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TB1 | HRTIM_OUTPUT_TB2 | HRTIM_OUTPUT_TA1 | HRTIM_OUTPUT_TA2);
 	HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
 	led_state[3] = 0;
@@ -184,7 +185,7 @@ void DC_DC_stop(void)
 	}
 	Cap_Data.cap_I_arm = 0;
 	can_sent();
-}
+	}
 
 // 设置涓流充电阈值
 #define Trickle_charging_V 1.5f
@@ -258,6 +259,10 @@ void PowerlimitUpdata(void)
 
 	clamp_f_limit(15, Cap_Data.can_powerlimit_value + 20, &battery_power_limit_temp);
 
+	if(Sample_Data.sample_Cap_V < 6)
+	{
+	    clamp_f_limit(15, 45, &battery_power_limit_temp);
+	}
 	// 在阈值前开始涓流充电，不包括动能回收
 	if (temp_V_limit > 0)
 	{
@@ -279,7 +284,7 @@ void PowerlimitUpdata(void)
 }
 #undef Trickle_charging_V
 
-/* 用于检测电容容值，并进行限压 */
+
 
 // 过流过压检测
 void Danger_tag(void)
@@ -377,7 +382,6 @@ uint8_t I_loop_test_run(void)
 		{
 			if (i_loop_cnt > 100)
 			{
-				Cap_Data.cap_I_arm = 0;
 
 				i_loop_cnt = 0;
 				return 1;
@@ -388,4 +392,13 @@ uint8_t I_loop_test_run(void)
 	}
 
 	return 0;
+}
+
+uint16_t Q15_mul(uint16_t a,uint16_t b)
+{
+	return (uint16_t)(((uint32_t)a*b)>>15);
+}
+uint16_t Q15_div(uint16_t a,uint16_t b)
+{
+	return (uint16_t)(((uint32_t)a<<15)/b);
 }

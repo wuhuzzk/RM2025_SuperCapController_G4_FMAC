@@ -36,8 +36,9 @@ uint32_t u32;
 
 // const uint8_t TX_FIFO_SIZE = 100;
 // static uint8_t buf[TX_FIFO_SIZE];				//发送缓冲区
+#define TX_FIFO_SIZE 4096
 fifo_s_t uart_tx_fifo;
-uint8_t uart_tx_area[2048]={0};
+uint8_t uart_tx_area[TX_FIFO_SIZE]={0};
 
 /* 局部变量定义 E N D */
 /*---------------------------------------------------------------------------*/
@@ -65,7 +66,7 @@ void Auotc_Init()
     tx_buffer[5]=ANOTC_LEN_H;  //数据长度
 
     frame_len =  tx_buffer[4] + tx_buffer[5] * 255;
-    fifo_s_init(&uart_tx_fifo,uart_tx_area,2048);
+    fifo_s_init(&uart_tx_fifo,uart_tx_area,TX_FIFO_SIZE);
 }
 /*---------------------------------------------------------------------------*/
 /**

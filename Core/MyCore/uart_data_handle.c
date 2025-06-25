@@ -114,6 +114,7 @@ void Uart_data_handle(void)
 				if (a==1)
 				{
 					Scheduler_continue(Start_task);
+					Cap_Data.state_core=0x00;
 				}
 				else
 				// DC_DC_start();
@@ -166,7 +167,7 @@ void Uart_data_handle(void)
 				a=strtod(a_t, &q);
 				clamp_f_limit(0,1.2f,&a);
 				Cap_Data.Ratio=a;
-				Duty_calcuate_V2_0(Cap_Data.Ratio);
+				Duty_calcuate_V3_Q15((uint16_t)(Cap_Data.Ratio*Q15_zoom));
 				HAL_GPIO_TogglePin(LED2_GPIO_Port,LED2_Pin);
 			}
 			
@@ -375,8 +376,8 @@ void power_Uart_sent(void)
 			// Cap_Data.state_core,
 			// Fmac_Read_data(),
 			
-
-			Sample_Data.sample_Pin24V_V,
+			Cap_Data.Famc_out_data,
+			// Sample_Data.sample_Pin24V_V,
 			
 			Sample_Data.sample_Cap_V,
 			
@@ -384,7 +385,7 @@ void power_Uart_sent(void)
 			// Cap_Data.cap_I_arm,
 			// ADC_RawData.adc_Cap_I_OPAmp,
 			// hfmac.Instance->WDATA,
-			
+
 			
 			Sample_Data.sample_Chassis_Power,
 			// Sample_Data.sample_Battery_I,
