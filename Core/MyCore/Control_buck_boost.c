@@ -5,17 +5,28 @@
 *** @Author         : TJL
 *** @Date           : 2025/5/5
 *** @版权归属:
-*                        ___          ___          ___
-*             ___       /\__\        /\  \        /\  \
-*            /\  \     /::|  |      /::\  \      /::\  \
-*            \:\  \   /:|:|  |     /:/\:\  \    /:/\:\  \
-*            /::\__\ /:/|:|__|__  /:/  \:\  \  /::\~\:\  \
-*         __/:/\/__//:/ |::::\__\/:/__/ \:\__\/:/\:\ \:\__\
-*        /\/:/  /   \/__/~~/:/  /\:\  \  \/__/\/__\:\/:/  /
-*        \::/__/          /:/  /  \:\  \           \::/  /
-*         \:\__\         /:/  /    \:\  \          /:/  /
-*          \/__/        /:/  /      \:\__\        /:/  /
-*                       \/__/        \/__/        \/__/
+*       _____                    _____                    _____  
+*      /\    \                  /\    \                  /\    \ 
+*     /::\    \                /::\    \                /::\____\
+*     \:::\    \               \:::\    \              /:::/    /
+*      \:::\    \               \:::\    \            /:::/    / 
+*       \:::\    \               \:::\    \          /:::/    /  
+*        \:::\    \               \:::\    \        /:::/    /   
+*        /::::\    \              /::::\    \      /:::/    /    
+*       /::::::\    \    _____   /::::::\    \    /:::/    /     
+*      /:::/\:::\    \  /\    \ /:::/\:::\    \  /:::/    /      
+*     /:::/  \:::\____\/::\    /:::/  \:::\____\/:::/____/       
+*    /:::/    \::/    /\:::\  /:::/    \::/    /\:::\    \       
+*   /:::/    / \/____/  \:::\/:::/    / \/____/  \:::\    \      
+*  /:::/    /            \::::::/    /            \:::\    \     
+* /:::/    /              \::::/    /              \:::\    \    
+* \::/    /                \::/    /                \:::\    \   
+*  \/____/                  \/____/                  \:::\    \  
+*                                                     \:::\    \ 
+*                                                      \:::\____\
+*                                                       \::/    /
+*                                                        \/____/ 
+*                                                                
 ******************************************************************************/
 #include "Control_buck_boost.h"
 #include "Vofa_send.h"
@@ -35,7 +46,7 @@ Pid_t pid_power_buffer;
 Pid_t *Pid_arrry[2] = {&pid_battery_power, &pid_power_buffer};
 
 cap_data Cap_Data = {.buffer_mode = 2, .Power_Limit = 45, .PID_State = 0, 
-	.Power_buffer_value = 2, .Power_buffer_percent = 0.966f, .can_powerlimit_value = 85, 
+	.Power_buffer_value = 2, .Power_buffer_percent = 0.966f, .can_powerlimit_value = 45, 
 	 .Cap_full_voltage_value = 23.5, .Cap_full_voltage_measured = 0, .Cap_full_voltage_Dset = 23.5, 
 	 .Cap_hight_V_mod = 0, .DCDC_start_step = 0, .Soft_Version = 0x03, .Can_sand = 0};
 extern uint8_t led_state[4];
@@ -91,9 +102,11 @@ void I_Loop_AdcToFloat(void)
 	Sample_Data.sample_Cap_I = (ADC_RawData.adc_Cap_I * 3.3f / 65536 - 1.65f) / 20 / 0.002f;
 }
 
-#define Period_M HRTIM1->sMasterRegs.MPER
-#define DCDC_MIN_DUTY 0.01f
-#define DCDC_MAX_DUTY (1 - DCDC_MIN_DUTY)
+#define ratio_zoom Q15_zoom
+#define Period_M 54400
+#define DCDC_MIN_DUTY 544//0.01
+#define DCDC_MAX_DUTY (ratio_zoom - DCDC_MIN_DUTY)
+#define Dead_multiple (ratio_zoom - 2 * DCDC_MIN_DUTY)
 /*
 总重装值为54400
 占空比最小1%最大99%(在总周期上的时长)
@@ -111,21 +124,18 @@ void HrtimerAB_UpdataForDuty_Q15(uint16_t a2_duty, uint16_t b2_duty)
 	HRTIM1->sMasterRegs.MCMP3R = cmp3temp;
 }
 
-#define Dead_multiple (1 - 2 * DCDC_MIN_DUTY)
 void Duty_calcuate_V3_Q15(uint16_t ratio) // ratio=Vcap/V24
 {
 	uint16_t a2 = DCDC_MIN_DUTY, b2 = DCDC_MIN_DUTY;
 	uint16_t ratio_temp=0;
 	if (ratio > ratio_zoom) // boosts 升压充电到电容 或者buck放电
 	{
-		ratio_temp = Q15_mul((ratio - ratio_zoom), Dead_multiple) + ratio_zoom + DCDC_MIN_DUTY; //@2.1 ￥
-		// HrtimerAB_UpdataForDuty_Q15(a2, ratio_zoom - Q15_div(ratio_zoom, ratio_temp));
+		ratio_temp = Q15_mul((ratio - ratio_zoom), Dead_multiple) + ratio_zoom + DCDC_MIN_DUTY; 
 		b2=ratio_zoom - Q15_div(ratio_zoom, ratio_temp);
 	}
 	else // buck 降压充电到电容 或者boosts放电
 	{
-		ratio_temp = Q15_mul(Dead_multiple , ratio) + DCDC_MIN_DUTY; //@2.1 ￥
-		// HrtimerAB_UpdataForDuty_Q15(ratio_zoom - ratio_temp, b2);
+		ratio_temp = Q15_mul(Dead_multiple , ratio) + DCDC_MIN_DUTY; 
 		a2=ratio_zoom - ratio_temp;
 	}
 	HrtimerAB_UpdataForDuty_Q15(a2, b2);
@@ -173,7 +183,7 @@ void DC_DC_stop(void)
 		Cap_Data.Stop_cnt++;
 	}
 
-	Cap_Data.PID_State = 0; // pid stop
+	Cap_Data.PID_State = 0;
 	Fmac_User_stop();
 	HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TB1 | HRTIM_OUTPUT_TB2 | HRTIM_OUTPUT_TA1 | HRTIM_OUTPUT_TA2);
 	HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);

@@ -24,7 +24,7 @@ extern scheduler_task_t scheduler_task[];
 extern fifo_s_t uart_tx_fifo;
 
 //串口调试器发送数据，由于if分支会产生性能浪费，故用宏定义
-#define Uart_Enfor 1
+#define Uart_Enfor 0
 
 #if Uart_Enfor == 1
 #define uasrt_power power_Uart_sent();

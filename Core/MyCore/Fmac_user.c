@@ -86,7 +86,6 @@ void Fmac_Init_user(float V_cap)
 	aOutputDataToPreload[1]=q15_temp;
 	aOutputDataToPreload[2]=q15_temp;
 	/*## Preload the input and output buffers ####################################*/
-	//   if (HAL_FMAC_FilterPreload(&hfmac, aInputValues,INPUT_BUFFER_SIZE,aOutputDataToPreload, COEFF_VECTOR_A_SIZE) != HAL_OK)
 	if (HAL_FMAC_FilterPreload(&hfmac, NULL, INPUT_BUFFER_SIZE, aOutputDataToPreload, COEFF_VECTOR_A_SIZE) != HAL_OK)
 	{
 		/* Configuration Error */

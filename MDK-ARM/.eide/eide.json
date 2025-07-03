@@ -457,7 +457,14 @@
         "AC6": {
           "version": 3,
           "beforeBuildTasks": [],
-          "afterBuildTasks": [],
+          "afterBuildTasks": [
+            {
+              "name": "auto download",
+              "disable": false,
+              "abortAfterFailed": true,
+              "command": "cmd.exe /C \"chcp 437 && ${EIDE_MSYS}\\..\\..\\..\\..\\tools\\st_cube_programer\\bin\\STM32_Programmer_CLI.exe -c port=SWD freq=4000 --download ${OutDir}\\${KEIL_OUTPUT_DIR}.hex -v --go\""
+            }
+          ],
           "global": {
             "output-debug-info": "enable"
           },
