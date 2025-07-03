@@ -89,8 +89,9 @@ sys2=tf(sys1) %切换格式，以导入设计工具
 ## 开源地址
 [本项目GitHub开源地址](https://github.com/wuhuzzk/RM2025_SuperCapController_G4_FMAC)
 
-[本项目论坛开源地址]()
+[本项目论坛开源地址](https://bbs.robomaster.com/article/723414)
 
+[下载地址releases](https://github.com/wuhuzzk/RM2025_SuperCapController_G4_FMAC/releases)
 
 
 ## 参考文献
